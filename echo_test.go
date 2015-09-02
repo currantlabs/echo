@@ -201,6 +201,32 @@ func TestEchoHandler(t *testing.T) {
 	})
 }
 
+func TestEchoFilter(t *testing.T) {
+	e := New()
+
+	// Bad Route
+	e.Get("/", func(c *Context) error {
+		return c.String(http.StatusOK, "Hello!")
+	})
+
+	// Good Route
+	e.Get("/echo", func(c *Context) error {
+		return c.String(http.StatusOK, "Echo!")
+	})
+
+	buf := new(bytes.Buffer)
+	e.Filter(func(c *Context) error {
+		buf.WriteString("a")
+		c.Request().URL.Path = "/echo"
+		return nil
+	})
+
+	c, b := request(GET, "/", e)
+	assert.Equal(t, "a", buf.String())
+	assert.Equal(t, http.StatusOK, c)
+	assert.Equal(t, "Echo!", b)
+}
+
 func TestEchoConnect(t *testing.T) {
 	e := New()
 	testMethod(t, CONNECT, "/", e)
@@ -401,15 +427,6 @@ func TestEchoServer(t *testing.T) {
 	e := New()
 	s := e.Server(":1323")
 	assert.IsType(t, &http.Server{}, s)
-}
-
-func TestStripTrailingSlash(t *testing.T) {
-	e := New()
-	e.StripTrailingSlash()
-	r, _ := http.NewRequest(GET, "/users/", nil)
-	w := httptest.NewRecorder()
-	e.ServeHTTP(w, r)
-	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func testMethod(t *testing.T, method, path string, e *Echo) {

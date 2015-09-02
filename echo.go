@@ -25,6 +25,7 @@ type (
 	Echo struct {
 		prefix                  string
 		middleware              []MiddlewareFunc
+		filters                 []Filter
 		http2                   bool
 		maxParam                *int
 		notFoundHandler         HandlerFunc
@@ -34,7 +35,6 @@ type (
 		renderer                Renderer
 		pool                    sync.Pool
 		debug                   bool
-		stripTrailingSlash      bool
 		router                  *Router
 	}
 
@@ -53,6 +53,7 @@ type (
 	MiddlewareFunc func(HandlerFunc) HandlerFunc
 	Handler        interface{}
 	HandlerFunc    func(*Context) error
+	Filter         func(*Context) error
 
 	// HTTPErrorHandler is a centralized HTTP error handler.
 	HTTPErrorHandler func(error, *Context)
@@ -134,7 +135,7 @@ const (
 	Location           = "Location"
 	Upgrade            = "Upgrade"
 	Vary               = "Vary"
-	WWWAuthenticate = "WWW-Authenticate"
+	WWWAuthenticate    = "WWW-Authenticate"
 
 	//-----------
 	// Protocols
@@ -255,9 +256,11 @@ func (e *Echo) Debug() {
 	e.debug = true
 }
 
-// StripTrailingSlash enables removing trailing slash from the request path.
-func (e *Echo) StripTrailingSlash() {
-	e.stripTrailingSlash = true
+// Use adds filter to the filter chain.
+func (e *Echo) Filter(f ...Filter) {
+	for _, h := range f {
+		e.filters = append(e.filters, h)
+	}
 }
 
 // Use adds handler to the middleware chain.
@@ -453,11 +456,15 @@ func (e *Echo) Routes() []Route {
 // ServeHTTP implements `http.Handler` interface, which serves HTTP requests.
 func (e *Echo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := e.pool.Get().(*Context)
+	c.reset(r, w, e)
+	for i := 0; i < len(e.filters); i++ {
+		e.filters[i](c)
+	}
 	h, echo := e.router.Find(r.Method, r.URL.Path, c)
 	if echo != nil {
 		e = echo
+		c.echo = e
 	}
-	c.reset(r, w, e)
 
 	// Chain middleware with handler in the end
 	for i := len(e.middleware) - 1; i >= 0; i-- {
