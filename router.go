@@ -295,13 +295,7 @@ func (r *Router) Find(method, path string, ctx *Context) (h HandlerFunc, e *Echo
 	// Search order static > param > match-any
 	for {
 		if search == "" {
-			if cn.handler != nil {
-				// Found
-				ctx.pnames = cn.pnames
-				h = cn.handler
-				e = cn.echo
-			}
-			return
+			goto Found
 		}
 
 		pl := 0 // Prefix length
@@ -340,10 +334,12 @@ func (r *Router) Find(method, path string, ctx *Context) (h HandlerFunc, e *Echo
 			if cn.handler == nil {
 				// Look up for match-any, might have an empty value for *, e.g.
 				// serving a directory. Issue #207
-				cn = cn.findChildWithType(mtype)
+				if cn = cn.findChildWithType(mtype); cn == nil {
+					return
+				}
 				ctx.pvalues[len(cn.pnames)-1] = ""
 			}
-			continue
+			goto Found
 		}
 
 		// Static node
@@ -382,17 +378,19 @@ func (r *Router) Find(method, path string, ctx *Context) (h HandlerFunc, e *Echo
 		// Match-any node
 	MatchAny:
 		// c = cn.getChild()
-		c = cn.findChildWithType(mtype)
-		if c != nil {
-			cn = c
-			ctx.pvalues[len(cn.pnames)-1] = search
-			search = "" // End search
-			continue
+		if cn = cn.findChildWithType(mtype); cn == nil {
+			// Not found
+			return
 		}
-
-		// Not found
-		return
+		ctx.pvalues[len(cn.pnames)-1] = search
+		goto Found
 	}
+
+Found:
+	ctx.pnames = cn.pnames
+	h = cn.handler
+	e = cn.echo
+	return
 }
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
