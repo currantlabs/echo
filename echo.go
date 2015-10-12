@@ -176,8 +176,8 @@ var (
 		return NewHTTPError(http.StatusNotFound)
 	}
 
-	badRequestHandler = func(c *Context) error {
-		return NewHTTPError(http.StatusBadRequest)
+	methodNotAllowedHandler = func(c *Context) error {
+		return NewHTTPError(http.StatusMethodNotAllowed)
 	}
 )
 
