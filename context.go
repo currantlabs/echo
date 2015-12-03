@@ -142,7 +142,7 @@ func (c *Context) HTML(code int, html string) (err error) {
 
 // String sends a string response with status code.
 func (c *Context) String(code int, s string) (err error) {
-	c.response.Header().Set(ContentType, TextPlain)
+	c.response.Header().Set(ContentType, TextPlainCharsetUTF8)
 	c.response.WriteHeader(code)
 	c.response.Write([]byte(s))
 	return
@@ -255,9 +255,14 @@ func (c *Context) Error(err error) {
 	c.echo.httpErrorHandler(err, c)
 }
 
+// Echo returns the `Echo` instance.
+func (c *Context) Echo() *Echo {
+	return c.echo
+}
+
 func (c *Context) reset(r *http.Request, w http.ResponseWriter, e *Echo) {
 	c.request = r
-	c.response.reset(w)
+	c.response.reset(w, e)
 	c.query = nil
 	c.store = nil
 	c.echo = e
